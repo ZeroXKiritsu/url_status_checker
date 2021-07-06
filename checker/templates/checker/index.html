@@ -90,11 +90,11 @@
             },
             success: (data) => {
                 if (data.is_deleted) {
-                    removeURL(data.url_id);
+                    removeURL(data.id);
                     return
                 }
                 if (data.is_paused === 0) {
-                    updateURLColor(data.url_id, data.response_status);
+                    updateURLColor(data.id, data.status);
                     setTimeout(() => {
                             checkURL(url_id);
                         },
@@ -130,7 +130,7 @@
                 },
                 success: (data) => {
                     if (data.is_deleted) {
-                        removeURL(data.url_id);
+                        removeURL(data.id);
                         return
                     }
                     if (data.status === "resume") {
@@ -138,7 +138,7 @@
                     } else if (data.status === "pause") {
                         $(this).html("pause check");
                         setTimeout(function () {
-                            checkURL(data.url_id);
+                            checkURL(data.id);
                         }, 1000)
                     } else {
                         console.log("Unknown status for url with id: ", url_id);
