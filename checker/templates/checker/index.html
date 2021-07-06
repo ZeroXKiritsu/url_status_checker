@@ -1,0 +1,152 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+    <title>URL Status Checker</title>
+</head>
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-11">
+            <h2 class="mt-5 mb-3">URL Status Checker</h2>
+            {% if urls %}
+                <table class="table" id="urls">
+                    <tr>
+                        <th scope="col" style="width: 50%">URL</th>
+                        <th scope="col" style="width: 20%">Check interval</th>
+                        <th scope="col" style="width: 30%">Pause / Resume check</th>
+                    </tr>
+                    <tbody>
+                    {% for url in urls %}
+                        <tr id="{{ url.id }}">
+                            <td style="width: 50%">
+                                <a href="{{ url.text }}">{{ url.text }}</a>
+                            </td>
+                            <td style="width: 20%">
+                                <p>{{ url.check_interval }} sec</p>
+                            </td>
+                            <td style="width: 30%">
+                                <button id="button_{{ url.id }}" data-url-id="{{ url.id }}"
+                                        type="button"
+                                        class="btn btn-primary btn-block pauseSwitcher">
+                                    {% if url.is_paused %}
+                                        resume check
+                                    {% else %}
+                                        pause check
+                                    {% endif %}
+                                </button>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <h3>Add some urls at <a href="http://localhost:8000/admin">admin</a></h3>
+            {% endif %}
+        </div>
+    </div>
+</div>
+<script src="https://code.jquery.com/jquery-3.4.1.min.js"
+        integrity="sha256-CSXorXvZcTkaix6Yvo6HppcZGetbYMGWSFlBw8HfCJo="
+        crossorigin="anonymous"></script>
+<script type="text/javascript">
+    const getCookie = (name) => {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            let cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                let cookie = cookies[i].trim();
+                // Does this cookie string begin with the name we want?
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    };
+
+    const updateURLColor = (url_id, response_code) => {
+        if (response_code === 200) {
+            $(`#${url_id}`).addClass("table-success");
+        } else {
+            $(`#${url_id}`).addClass("table-danger");
+        }
+    };
+
+    const removeURL = (url_id) => {
+        $(`#${url_id}`).remove();
+    };
+
+    function checkURL(url_id) {
+        $.ajax({
+            url: 'check_url',
+            type: 'post',
+            dataType: "json",
+            data: {
+                csrfmiddlewaretoken: getCookie('csrftoken'),
+                url_id: url_id,
+            },
+            success: (data) => {
+                if (data.is_deleted) {
+                    removeURL(data.url_id);
+                    return
+                }
+                if (data.is_paused === 0) {
+                    updateURLColor(data.url_id, data.response_status);
+                    setTimeout(() => {
+                            checkURL(url_id);
+                        },
+                        data.check_interval * 1000
+                    )
+                }
+            }
+        });
+    }
+
+    $(document).ready(() => {
+        let rows = $("#urls > tbody > tr").toArray();
+        rows.forEach((row) => {
+            let url_id = row.id;
+            if (url_id) {
+                setTimeout(
+                    () => {
+                        checkURL(url_id)
+                    }, 1000
+                )
+            }
+        });
+
+        $(".pauseSwitcher").click(function () {
+            let url_id = $(this).attr("data-url-id");
+            $.ajax({
+                url: 'update_url',
+                type: 'post',
+                dataType: "json",
+                data: {
+                    csrfmiddlewaretoken: getCookie('csrftoken'),
+                    url_id: url_id,
+                },
+                success: (data) => {
+                    if (data.is_deleted) {
+                        removeURL(data.url_id);
+                        return
+                    }
+                    if (data.status === "resume") {
+                        $(this).html("resume check");
+                    } else if (data.status === "pause") {
+                        $(this).html("pause check");
+                        setTimeout(function () {
+                            checkURL(data.url_id);
+                        }, 1000)
+                    } else {
+                        console.log("Unknown status for url with id: ", url_id);
+                    }
+                },
+            });
+        });
+    });
+</script>
+</body>
+</html>
